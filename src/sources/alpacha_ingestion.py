@@ -38,19 +38,19 @@ class AlpacaTradeSource:
         self.client = StockHistoricalDataClient(api_key, secret_key)
         self.feed = feed
 
-    def get_trades(
+    def iter_trades(
         self,
         symbol: str,
         start: datetime,
         end: datetime,
-        limit: int | None = None,
-    ) -> list[Trade]:
+        page_limit: int | None = None,
+    ) -> Iterator[Trade]:
         """
-        Fetch all trades for `symbol` between start and end, handling
-        pagination. Returns trades sorted chronologically.
+        Yield trades for `symbol` between start and end, one at a time,
+        fetching pages lazily from Alpaca as needed.
         """
-        all_trades: list[Trade] = []
         page_token: str | None = None
+        total = 0
 
         while True:
             request = StockTradesRequest(
@@ -58,7 +58,7 @@ class AlpacaTradeSource:
                 start=start,
                 end=end,
                 feed=self.feed,
-                limit=limit,
+                limit=page_limit,
                 page_token=page_token,
             )
 
@@ -68,14 +68,15 @@ class AlpacaTradeSource:
             if not raw_trades:
                 break
 
-            all_trades.extend(self._to_trade(symbol, t) for t in raw_trades)
+            for raw in raw_trades:
+                total += 1
+                yield self._to_trade(symbol, raw)
 
             page_token = getattr(response, "next_page_token", None)
             if not page_token:
                 break
 
-        logger.info("Fetched %d trades for %s (%s to %s)", len(all_trades), symbol, start, end)
-        return all_trades
+        logger.info("Streamed %d trades for %s (%s to %s)", total, symbol, start, end)  
 
     @staticmethod
     def _to_trade(symbol: str, raw) -> Trade:
