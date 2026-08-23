@@ -1,8 +1,8 @@
 import argparse
 import logging
 import os
+from collections.abc import Iterator
 from datetime import datetime
-from zipfile import Path
 
 from alpaca.data.enums import DataFeed
 from alpaca.data.historical.stock import StockHistoricalDataClient
@@ -32,7 +32,7 @@ class AlpacaTradeSource:
         if not api_key or not secret_key:
             raise ValueError(
                 "Alpaca API credentials missing. Pass them explicitly or "
-                "set APCA_API_KEY_ID / APCA_SECRET_KEY."
+                "set APCA_API_KEY_ID / APCA_API_SECRET_KEY."
             )
 
         self.client = StockHistoricalDataClient(api_key, secret_key)
@@ -93,23 +93,15 @@ class AlpacaTradeSource:
 
 
 if __name__ == "__main__":
-
     from dotenv import load_dotenv
-    import os
-
 
     load_dotenv()
-    import os
-    from pathlib import Path
 
-    print("cwd:", os.getcwd())
-    print("this file:", Path(__file__).resolve())
-    print(".env exists:", Path(".env").exists())
     parser = argparse.ArgumentParser(description="Fetch a small sample of Alpaca trades")
     parser.add_argument("symbol", nargs="?", default="SPY", help="Ticker symbol to test")
     parser.add_argument("--start", default="2024-01-02T00:00:00", help="Start time in ISO format")
     parser.add_argument("--end", default="2024-01-03T00:00:00", help="End time in ISO format")
-    parser.add_argument("--limit", type=int, default=5, help="Number of trades to fetch per page")
+    parser.add_argument("--limit", type=int, default=5, help="Number of trades to print")
     args = parser.parse_args()
 
     try:
@@ -119,8 +111,8 @@ if __name__ == "__main__":
 
     start = datetime.fromisoformat(args.start)
     end = datetime.fromisoformat(args.end)
-    trades = source.get_trades(args.symbol, start, end, limit=args.limit)
 
-    print(f"Fetched {len(trades)} trades for {args.symbol}")
-    for trade in trades[:5]:
+    for i, trade in enumerate(source.iter_trades(args.symbol, start, end)):
+        if i >= args.limit:
+            break
         print(trade)
