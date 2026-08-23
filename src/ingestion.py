@@ -1,12 +1,17 @@
-
-APCA_API_ENDPOINT="https://paper-api.alpaca.markets/v2"
-API_KEY = "PK43BORIQOXSF3X3UAB74RB76H"
-SECRET_KEY = "66qe9NvsjxY1iTjLA4snHoo7EXRvvLLVLAjWkNRj4cSp"
-
-
 from datetime import datetime
 from alpaca.data.historical.stock import StockHistoricalDataClient
 from alpaca.data.requests import StockTradesRequest
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+API_KEY = os.getenv("APCA_API_KEY")
+SECRET_KEY = os.getenv("APCA_SECRET_KEY")
+
+if not API_KEY or not SECRET_KEY:
+    raise RuntimeError("Alpaca API credentials not found")
 
 
 class AlpacaTradeSource:
