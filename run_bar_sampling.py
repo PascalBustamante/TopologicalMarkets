@@ -2,6 +2,7 @@ import logging
 from datetime import date
 
 from dotenv import load_dotenv
+import os
 
 from src.ingestion.bar.factory import SamplingMethod, make_bar_builder
 from src.ingestion.bar.stream import sample_bars
@@ -17,8 +18,8 @@ THRESHOLDS = {
 }
 
 
-def run(symbol: str, date_range: DateRange) -> None:
-    source = AlpacaTradeSource()
+def run(symbol: str, date_range: DateRange, api_key, api_secret) -> None:
+    source = AlpacaTradeSource(api_key=api_key, secret_key=api_secret)
 
     for method, threshold in THRESHOLDS.items():
         builder = make_bar_builder(method, threshold)
@@ -33,4 +34,6 @@ def run(symbol: str, date_range: DateRange) -> None:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     load_dotenv()
-    run("SPY", DateRange.single_day(date(2024, 1, 2)))
+    api_key = os.getenv('APCA_API_KEY')
+    api_secret = os.getenv('APCA_API_SECRET')
+    run("SPY", DateRange.single_day(date(2024, 1, 2)), api_key, api_secret)

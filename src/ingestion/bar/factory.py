@@ -4,18 +4,21 @@ from src.ingestion.bar.base import BarBuilder
 from src.ingestion.bar.tick_builder import TickBarBuilder
 from src.ingestion.bar.volume_builder import VolumeBarBuilder
 from src.ingestion.bar.dollar_builder import DollarBarBuilder
+from src.ingestion.bar.time_builder import TimeBarBuilder
 
 
 class SamplingMethod(Enum):
     TICK = "tick"
     VOLUME = "volume"
     DOLLAR = "dollar"
+    TIME = "time"
 
 
 _BUILDERS: dict[SamplingMethod, type[BarBuilder]] = {
     SamplingMethod.TICK: TickBarBuilder,
     SamplingMethod.VOLUME: VolumeBarBuilder,
     SamplingMethod.DOLLAR: DollarBarBuilder,
+    SamplingMethod.TIME: TimeBarBuilder,
 }
 
 
