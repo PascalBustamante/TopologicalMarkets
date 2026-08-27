@@ -6,7 +6,42 @@ from sklearn.gaussian_process.kernels import RBF, ConstantKernel, WhiteKernel
 
 from src.ingestion.bar.bar import Bar
 from src.topology.landscape import landscape_vector
+from src.topology.persistence import PersistencePair
 from src.topology.rolling import windowed_diagrams
+from src.topology.targets import TargetFn, forward_log_return
+
+
+def windowed_dataset(
+    bars: Sequence[Bar],
+    window: int,
+    step: int,
+    target_fn: TargetFn,
+    embedding_dimension: int = 2,
+    embedding_delay: int = 3,
+    rips_max_dimension: int = 2,
+) -> tuple[list[list[PersistencePair]], np.ndarray]:
+    """
+    Raw per-window persistence diagrams (all homology dimensions) paired
+    with a target computed by `target_fn(bars, end_index)` — e.g. forward
+    log-return or forward realized volatility (see targets.py). `target_fn`
+    returning None skips a window (e.g. it would need bars past the series
+    end). The shared input for any downstream feature extraction — a
+    landscape vector for one homology dimension, or a diagram-native kernel
+    (e.g. sliced Wasserstein) that doesn't reduce a diagram to a vector.
+    """
+    diagrams: list[list[PersistencePair]] = []
+    targets: list[float] = []
+
+    for end_index, _, diagram in windowed_diagrams(
+        bars, window, step, embedding_dimension, embedding_delay, rips_max_dimension
+    ):
+        target = target_fn(bars, end_index)
+        if target is None:
+            continue
+        diagrams.append(diagram)
+        targets.append(target)
+
+    return diagrams, np.array(targets)
 
 
 def topological_features(
@@ -18,28 +53,30 @@ def topological_features(
     embedding_delay: int = 3,
     homology_dimension: int = 1,
     resolution: int = 50,
+    rips_max_dimension: int = 2,
+    target_fn: TargetFn | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Persistence-landscape feature matrix (one row per rolling window) paired
-    with the forward log-return `horizon` bars past each window's end bar —
-    the (X, y) training pair for a topologically-kerneled GP forecast.
+    with a target — forward log-return `horizon` bars out by default, or
+    whatever `target_fn` computes (e.g. forward realized volatility).
     """
-    vectors: list[np.ndarray] = []
-    targets: list[float] = []
-
-    for end_index, as_of_bar, diagram in windowed_diagrams(
-        bars, window, step, embedding_dimension, embedding_delay
-    ):
-        target_index = end_index + horizon
-        if target_index >= len(bars):
-            continue
-
-        vectors.append(
+    diagrams, targets = windowed_dataset(
+        bars,
+        window,
+        step,
+        target_fn or forward_log_return(horizon),
+        embedding_dimension,
+        embedding_delay,
+        rips_max_dimension,
+    )
+    vectors = np.array(
+        [
             landscape_vector(diagram, homology_dimension=homology_dimension, resolution=resolution)
-        )
-        targets.append(np.log(bars[target_index].close / as_of_bar.close))
-
-    return np.array(vectors), np.array(targets)
+            for diagram in diagrams
+        ]
+    )
+    return vectors, targets
 
 
 def fit_topological_gp(X: np.ndarray, y: np.ndarray) -> GaussianProcessRegressor:
