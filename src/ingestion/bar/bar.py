@@ -14,3 +14,8 @@ class Bar:
     n_ticks: int
     start_ts: datetime
     end_ts: datetime
+
+    @property
+    def vwap(self) -> float:
+        """Volume-weighted average price across the bar's constituent trades."""
+        return self.dollar_volume / self.volume
