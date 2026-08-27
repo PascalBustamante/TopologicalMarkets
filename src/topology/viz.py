@@ -37,6 +37,61 @@ def plot_point_cloud(cloud: np.ndarray, title: str = "", path: str | None = None
         plt.show()
 
 
+def plot_forecast_surface(
+    gp,
+    X_2d: np.ndarray,
+    resolution: int = 60,
+    title: str = "",
+    path: str | None = None,
+) -> None:
+    """
+    Evaluate a GP's posterior mean/std over a grid spanning X_2d's range,
+    rendering the continuous forecast surface a Kriging model actually
+    defines -- not just its value at discrete test points. `gp` must have
+    been fit on 2D input (e.g. the top-2 whitened/PCA components of the
+    topological feature space, for visualization -- the full model can use
+    more dimensions than this 2D view shows).
+    """
+    x_min, x_max = X_2d[:, 0].min(), X_2d[:, 0].max()
+    y_min, y_max = X_2d[:, 1].min(), X_2d[:, 1].max()
+    xs = np.linspace(x_min, x_max, resolution)
+    ys = np.linspace(y_min, y_max, resolution)
+    xx, yy = np.meshgrid(xs, ys)
+    grid = np.column_stack([xx.ravel(), yy.ravel()])
+
+    mean, std = gp.predict(grid, return_std=True)
+    mean = mean.reshape(xx.shape)
+    std = std.reshape(xx.shape)
+    train_mean = gp.predict(X_2d)
+
+    fig = plt.figure(figsize=(11, 5))
+
+    ax1 = fig.add_subplot(1, 2, 1, projection="3d")
+    ax1.plot_surface(xx, yy, mean, cmap="viridis", alpha=0.85)
+    ax1.scatter(X_2d[:, 0], X_2d[:, 1], train_mean, c="red", s=8)
+    ax1.set_xlabel("PC1 (whitened)")
+    ax1.set_ylabel("PC2 (whitened)")
+    ax1.set_zlabel("predicted forward return")
+    ax1.set_title("Kriging mean surface")
+
+    ax2 = fig.add_subplot(1, 2, 2)
+    contour = ax2.contourf(xx, yy, std, cmap="magma")
+    ax2.scatter(X_2d[:, 0], X_2d[:, 1], c="white", s=6, edgecolors="black", linewidths=0.3)
+    fig.colorbar(contour, ax=ax2, label="predictive std")
+    ax2.set_xlabel("PC1 (whitened)")
+    ax2.set_ylabel("PC2 (whitened)")
+    ax2.set_title("Kriging uncertainty")
+
+    fig.suptitle(title or "Forecast surface over topological feature space")
+    fig.tight_layout()
+
+    if path:
+        fig.savefig(path, dpi=150)
+        plt.close(fig)
+    else:
+        plt.show()
+
+
 if __name__ == "__main__":
     from datetime import date
 
